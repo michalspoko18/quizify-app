@@ -240,14 +240,26 @@ quizify-app/
 
 ## 📚 Documentation
 
-Comprehensive documentation is available in the `/docs` directory:
+### 📖 Complete Documentation
+
+**[📚 DOCUMENTATION.md](./DOCUMENTATION.md)** - **All-in-one comprehensive documentation file** with everything you need:
+- Project Overview
+- Quick Start Guide
+- Features & User Guide
+- Developer Guide & Coding Standards
+- Architecture & System Design
+- API Reference
+- Deployment Instructions
+- Contributing Guidelines
+- Troubleshooting & FAQ
+
+### 📂 Additional Documentation
+
+Detailed documentation is also available in separate files in the `/docs` directory:
 
 - **[Architecture Guide](./docs/ARCHITECTURE.md)** - System architecture and design patterns
 - **[API Documentation](./docs/API.md)** - Backend API endpoints and usage
 - **[Developer Guide](./docs/DEVELOPER_GUIDE.md)** - Development setup and guidelines
-- **[User Guide](./docs/USER_GUIDE.md)** - End-user instructions
-- **[Deployment Guide](./docs/DEPLOYMENT.md)** - Production deployment steps
-- **[Contributing Guidelines](./docs/CONTRIBUTING.md)** - How to contribute
 - **[Session Management](./SESSION_MANAGEMENT.md)** - Authentication deep-dive
 - **[Frontend Documentation](./docs/frontend.md)** - Frontend architecture (Polish)
 
