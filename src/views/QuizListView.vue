@@ -217,7 +217,16 @@ async function loadMyQuizzes() {
 async function deleteQuiz(quizId) {
   if (!confirm("Czy na pewno chcesz usunąć ten quiz?")) return;
   try {
-    await quizAPI.deleteQuiz(quizId);
+    const params = {};
+    if (authStore.sub) params.ownerId = authStore.sub;
+    try {
+      const ud = authCookies.getUserData();
+      if (ud && ud.sub) params.ownerGoogleId = ud.sub;
+    } catch (e) {
+      // ignore
+    }
+
+    await quizAPI.deleteQuiz(quizId, params);
     await loadMyQuizzes();
   } catch (e) {
     alert(e.message || "Nie udało się usunąć quizu");

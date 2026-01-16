@@ -15,12 +15,15 @@
       <p class="mt-2">Ładowanie danych rankingu...</p>
     </div>
 
-    <div v-if="error" class="alert alert-danger d-flex justify-content-between align-items-center">
+    <div
+      v-if="error"
+      class="alert alert-danger d-flex justify-content-between align-items-center"
+    >
+      <div><strong>Błąd:</strong> {{ error }}</div>
       <div>
-        <strong>Błąd:</strong> {{ error }}
-      </div>
-      <div>
-        <button class="btn btn-sm btn-outline-light" @click="loadRankings">Spróbuj ponownie</button>
+        <button class="btn btn-sm btn-outline-light" @click="loadRankings">
+          Spróbuj ponownie
+        </button>
       </div>
     </div>
 
@@ -220,7 +223,8 @@ async function loadRankings() {
     }
   } catch (err) {
     console.warn("Error loading rankings", err);
-    error.value = err?.message || String(err) || "Błąd podczas pobierania danych";
+    error.value =
+      err?.message || String(err) || "Błąd podczas pobierania danych";
   } finally {
     loading.value = false;
   }

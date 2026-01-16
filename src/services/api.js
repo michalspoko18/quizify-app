@@ -105,7 +105,7 @@ export const quizAPI = {
   answerQuiz: (id, data) => api.post(`/quizzes/${id}/answer`, data),
   createQuiz: (data) => api.post("/quizzes/", data),
   updateQuiz: (id, data) => api.put(`/quizzes/${id}`, data),
-  deleteQuiz: (id) => api.delete(`/quizzes/${id}`),
+  deleteQuiz: (id, params) => api.delete(`/quizzes/${id}`, { params }),
 };
 
 export const rankingAPI = {
