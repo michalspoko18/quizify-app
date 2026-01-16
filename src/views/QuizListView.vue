@@ -38,12 +38,17 @@
           <div class="card h-100 shadow-sm hover-card">
             <div class="card-body">
               <h5 class="card-title">{{ quiz.title }}</h5>
-              <p class="card-text text-muted small">{{ quiz.description }}</p>
+              <p
+                class="card-text text-muted small"
+                :title="quiz.description && quiz.description.length > 140 ? quiz.description : ''"
+              >
+                {{ truncate(quiz.description, 140) }}
+              </p>
               <div
                 class="d-flex justify-content-between align-items-center mt-3"
               >
                 <small class="text-muted">
-                  {{ (quiz.questions && quiz.questions.length) || 0 }} pytań
+                  {{ formatQuestionsLabel(quiz.questionsCount ?? ((quiz.questions && quiz.questions.length) || 0)) }}
                 </small>
                 <RouterLink
                   :to="'/quiz/' + quiz.id"
@@ -93,16 +98,15 @@
                 <h5 class="card-title mb-0">{{ quiz.title }}</h5>
                 <span class="badge bg-success">Własny</span>
               </div>
-              <p class="card-text text-muted">
-                {{ quiz.description || "Brak opisu" }}
+              <p
+                class="card-text text-muted"
+                :title="quiz.description && quiz.description.length > 200 ? quiz.description : ''"
+              >
+                {{ quiz.description ? truncate(quiz.description, 200) : "Brak opisu" }}
               </p>
               <div class="d-flex justify-content-between align-items-center">
                 <small class="text-muted">
-                  {{
-                    quiz.questionsCount ??
-                    ((quiz.questions && quiz.questions.length) || 0)
-                  }}
-                  pytań
+                  {{ formatQuestionsLabel(quiz.questionsCount ?? ((quiz.questions && quiz.questions.length) || 0)) }}
                 </small>
                 <div class="btn-group">
                   <RouterLink
@@ -150,6 +154,23 @@ const loadingMine = ref(false);
 const errorMine = ref(null);
 const currentPage = ref(0);
 const quizzesPerPage = 3;
+
+function formatQuestionsLabel(n) {
+  const count = Number(n) || 0;
+  const last2 = count % 100;
+  const last = count % 10;
+  if (count === 1) return `${count} pytanie`;
+  if (last2 >= 12 && last2 <= 14) return `${count} pytań`;
+  if (last >= 2 && last <= 4) return `${count} pytania`;
+  return `${count} pytań`;
+}
+
+function truncate(text, max = 120) {
+  if (!text && text !== "") return "";
+  const s = String(text);
+  if (s.length <= max) return s;
+  return s.slice(0, max).trimEnd() + "…";
+}
 
 // Oblicz całkowitą liczbę stron
 const totalPages = computed(() =>

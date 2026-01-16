@@ -504,6 +504,33 @@ onMounted(() => {
   background: var(--bs-body-bg);
   border: 1px solid var(--bs-border-color);
 }
+/* Prevent long description text from overflowing the layout */
+.quiz-header h2 {
+  word-break: break-word;
+  white-space: normal;
+}
+.quiz-header p {
+  white-space: pre-wrap; /* preserve paragraphs but allow wrapping */
+  word-break: break-word; /* break long words */
+  overflow-wrap: anywhere;
+  margin-bottom: 0.75rem;
+}
+
+/* Keep progress bar text readable and avoid overflow */
+.progress {
+  min-width: 0;
+}
+.progress-bar {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Ensure the quiz container doesn't allow horizontal scrolling */
+.quiz-container {
+  max-width: 100%;
+  box-sizing: border-box;
+}
 
 .answers-list {
   display: flex;
