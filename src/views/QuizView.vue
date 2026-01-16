@@ -219,9 +219,9 @@
                 class="card mb-3 border-danger"
               >
                 <div class="card-body">
-                  <h6 class="card-subtitle mb-3 text-muted">
+                  <!-- <h6 class="card-subtitle mb-3 text-muted">
                     Pytanie {{ index + 1 }}
-                  </h6>
+                  </h6> -->
                   <p class="card-text fw-bold mb-3">{{ item.question }}</p>
 
                   <div class="row g-2">
@@ -386,17 +386,28 @@ async function finishQuiz() {
 
     // Zapisz wynik do rankingu
     // Always save locally and attempt backend persist. saveScore will attach anon id if needed.
-    saveScore({
-      userId: effectiveUserId,
-      userName: store.name || store.email,
-      userNick: store.nick || store.name,
-      quizId: quiz.value.id,
-      quizTitle: quiz.value.title,
-      score: results.value.percentage,
-      correctAnswers: results.value.correctAnswers,
-      totalQuestions: results.value.totalQuestions,
-      passed: results.value.passed,
-    });
+    try {
+      await saveScore({
+        userId: effectiveUserId,
+        userName: store.name || store.email,
+        userNick: store.nick || store.name,
+        quizId: quiz.value.id,
+        quizTitle: quiz.value.title,
+        score: results.value.percentage,
+        correctAnswers: results.value.correctAnswers,
+        totalQuestions: results.value.totalQuestions,
+        passed: results.value.passed,
+      });
+
+      // Notify other parts of the app (e.g. Ranking view) that rankings changed
+      try {
+        window.dispatchEvent(new CustomEvent("ranking:updated"));
+      } catch (e) {
+        // ignore
+      }
+    } catch (e) {
+      console.warn("saveScore failed:", e);
+    }
 
     showResults.value = true;
     console.log("Wyniki quizu:", results.value);

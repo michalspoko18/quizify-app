@@ -62,18 +62,24 @@
         <small v-if="loading" class="text-muted">Ładowanie quizów...</small>
         <small v-else-if="error" class="text-danger">{{ error }}</small>
         <small v-else class="text-muted">
-          Strona {{ currentPage + 1 }} z {{ totalPages }} ({{
-            quizzes.length
-          }}
+          Strona {{ currentPage + 1 }} z {{ totalPages }} ({{ quizzes.length }}
           quizów)
         </small>
       </div>
     </div>
 
-    <!-- Własne quizy -->
-    <div v-if="customQuizzes.length > 0">
+    <!-- Własne quizy (z backendu) -->
+    <div class="mt-4">
       <h4 class="mb-3">Twoje quizy</h4>
-      <div class="row g-3">
+
+      <div v-if="loadingMine" class="text-muted">
+        Ładowanie Twoich quizów...
+      </div>
+      <div v-else-if="errorMine" class="alert alert-warning">
+        {{ errorMine }}
+      </div>
+
+      <div v-else-if="customQuizzes.length > 0" class="row g-3">
         <div
           v-for="quiz in customQuizzes"
           :key="'custom-' + quiz.id"
@@ -91,9 +97,13 @@
                 {{ quiz.description || "Brak opisu" }}
               </p>
               <div class="d-flex justify-content-between align-items-center">
-                <small class="text-muted"
-                  >{{ quiz.questions.length }} pytań</small
-                >
+                <small class="text-muted">
+                  {{
+                    quiz.questionsCount ??
+                    ((quiz.questions && quiz.questions.length) || 0)
+                  }}
+                  pytań
+                </small>
                 <div class="btn-group">
                   <RouterLink
                     :to="'/quiz/' + quiz.id"
@@ -114,12 +124,11 @@
           </div>
         </div>
       </div>
-    </div>
 
-    <!-- Brak własnych quizów -->
-    <div v-else class="alert alert-info">
-      <strong>Brak własnych quizów.</strong> Utwórz swój pierwszy quiz klikając
-      <RouterLink to="/create">tutaj</RouterLink>.
+      <div v-else class="alert alert-info">
+        <strong>Brak własnych quizów.</strong> Utwórz swój pierwszy quiz
+        klikając <RouterLink to="/create">tutaj</RouterLink>.
+      </div>
     </div>
   </div>
 </template>
@@ -128,12 +137,17 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { quizAPI } from "../services/api.js";
+import { useAuth } from "../store/auth.js";
+import { authCookies } from "../utils/cookies.js";
 
 const router = useRouter();
+const { store: authStore } = useAuth();
 const customQuizzes = ref([]);
 const quizzes = ref([]);
 const loading = ref(false);
 const error = ref(null);
+const loadingMine = ref(false);
+const errorMine = ref(null);
 const currentPage = ref(0);
 const quizzesPerPage = 3;
 
@@ -174,16 +188,39 @@ async function loadQuizzes() {
   }
 }
 
-function loadCustomQuizzes() {
-  const stored = localStorage.getItem("custom_quizzes");
-  customQuizzes.value = stored ? JSON.parse(stored) : [];
+async function loadMyQuizzes() {
+  loadingMine.value = true;
+  errorMine.value = null;
+  try {
+    const params = {};
+    // Prefer local user id if available
+    if (authStore.sub) params.ownerId = authStore.sub;
+    // Also send google sub if we have it in cookie user data
+    try {
+      const ud = authCookies.getUserData();
+      if (ud && ud.sub) params.ownerGoogleId = ud.sub;
+    } catch (e) {
+      // ignore
+    }
+
+    const { data } = await quizAPI.getMyQuizzes(params);
+    customQuizzes.value = Array.isArray(data) ? data : [];
+  } catch (e) {
+    // If not authenticated/expired session, keep empty list and show message
+    customQuizzes.value = [];
+    errorMine.value = e.message || "Nie udało się pobrać Twoich quizów";
+  } finally {
+    loadingMine.value = false;
+  }
 }
 
-function deleteQuiz(quizId) {
-  if (confirm("Czy na pewno chcesz usunąć ten quiz?")) {
-    const quizzes = customQuizzes.value.filter((q) => q.id !== quizId);
-    localStorage.setItem("custom_quizzes", JSON.stringify(quizzes));
-    loadCustomQuizzes();
+async function deleteQuiz(quizId) {
+  if (!confirm("Czy na pewno chcesz usunąć ten quiz?")) return;
+  try {
+    await quizAPI.deleteQuiz(quizId);
+    await loadMyQuizzes();
+  } catch (e) {
+    alert(e.message || "Nie udało się usunąć quizu");
   }
 }
 
@@ -192,7 +229,7 @@ function goBack() {
 }
 
 onMounted(() => {
-  loadCustomQuizzes();
+  loadMyQuizzes();
   loadQuizzes();
 });
 </script>

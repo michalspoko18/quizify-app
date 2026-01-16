@@ -112,14 +112,7 @@ export async function ensureSession(){
     return state.account !== null
   }
 
-  clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
-  if (!clientId) { 
-    console.error('Brak VITE_GOOGLE_CLIENT_ID')
-    state.isInitialized = true
-    return false
-  }
-
-  // First try to load from cookies
+  // First try to load from cookies (Google token flow)
   const hasValidCookieSession = loadSessionFromCookies()
   
   if (hasValidCookieSession) {
@@ -158,6 +151,38 @@ export async function ensureSession(){
       // Remove expired token
       sessionStorage.removeItem('quizapp:idtoken')
     }
+  }
+
+  // Try backend session-based auth (email/password login uses Django session cookie)
+  try {
+    const response = await authAPI.me()
+    const data = response?.data
+    if (data && data.id) {
+      state.account = {
+        sub: String(data.id),
+        email: data.email,
+        name: data.nick || data.email,
+        picture: null,
+      }
+      state.idToken = null
+      state.refreshToken = null
+      state.nick = data.nick || null
+      state.permissions = data.permissions || []
+      state.lastActivity = Date.now()
+
+      state.isInitialized = true
+      return true
+    }
+  } catch (e) {
+    // not logged in via session
+  }
+
+  // Google login is optional: don't fail the whole app when missing
+  clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
+  if (!clientId) {
+    console.warn('Brak VITE_GOOGLE_CLIENT_ID — Google login disabled')
+    state.isInitialized = true
+    return false
   }
 
   // Initialize Google Identity Services

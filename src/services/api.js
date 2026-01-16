@@ -94,14 +94,16 @@ export const authAPI = {
   loginWithGoogle: (data) => api.post("/auth/google", data),
   logout: () => api.post("/auth/logout"),
   refreshToken: () => api.post("/auth/refresh"),
+  me: () => api.get("/me"),
   updateProfile: (data) => api.put("/auth/profile", data),
 };
 
 export const quizAPI = {
-  getQuizzes: () => api.get("/quizzes"),
+  getQuizzes: () => api.get("/quizzes/"),
+  getMyQuizzes: (params) => api.get("/quizzes/mine", { params }),
   getQuiz: (id) => api.get(`/quizzes/${id}`),
   answerQuiz: (id, data) => api.post(`/quizzes/${id}/answer`, data),
-  createQuiz: (data) => api.post("/quizzes", data),
+  createQuiz: (data) => api.post("/quizzes/", data),
   updateQuiz: (id, data) => api.put(`/quizzes/${id}`, data),
   deleteQuiz: (id) => api.delete(`/quizzes/${id}`),
 };

@@ -7,6 +7,23 @@
       </RouterLink>
     </div>
 
+    <!-- Loading / Error -->
+    <div v-if="loading" class="text-center mb-4">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Ładowanie...</span>
+      </div>
+      <p class="mt-2">Ładowanie danych rankingu...</p>
+    </div>
+
+    <div v-if="error" class="alert alert-danger d-flex justify-content-between align-items-center">
+      <div>
+        <strong>Błąd:</strong> {{ error }}
+      </div>
+      <div>
+        <button class="btn btn-sm btn-outline-light" @click="loadRankings">Spróbuj ponownie</button>
+      </div>
+    </div>
+
     <!-- Globalny ranking -->
     <div class="card shadow mb-4">
       <div class="card-header bg-primary text-white">
@@ -157,7 +174,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
+import { ref, onMounted, onUnmounted } from "vue";
 import {
   getGlobalRankings,
   getUserStats,
@@ -177,7 +194,13 @@ const userStats = ref({
   totalQuestions: 0,
 });
 
+const loading = ref(false);
+const error = ref(null);
+
 async function loadRankings() {
+  loading.value = true;
+  error.value = null;
+
   // Wyczyść nieprawidłowe wpisy przy pierwszym załadowaniu
   cleanInvalidRankings();
 
@@ -196,8 +219,10 @@ async function loadRankings() {
       userStats.value = s;
     }
   } catch (err) {
-    // silent fallback: leave arrays empty
     console.warn("Error loading rankings", err);
+    error.value = err?.message || String(err) || "Błąd podczas pobierania danych";
+  } finally {
+    loading.value = false;
   }
 }
 
@@ -208,6 +233,18 @@ function getBadgeClass(score) {
 }
 
 onMounted(loadRankings);
+// Listen for external updates (e.g. after finishing a quiz)
+function handleRankingUpdated() {
+  loadRankings();
+}
+
+onMounted(() => {
+  window.addEventListener("ranking:updated", handleRankingUpdated);
+});
+
+onUnmounted(() => {
+  window.removeEventListener("ranking:updated", handleRankingUpdated);
+});
 </script>
 
 <style scoped>

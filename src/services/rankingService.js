@@ -38,7 +38,7 @@ import { rankingAPI } from "./api.js";
 import { useAuth } from "../store/auth.js";
 import { authCookies } from "../utils/cookies.js";
 
-export function saveScore(scoreData) {
+export async function saveScore(scoreData) {
   const rankings = getRankings();
 
   // Jeśli nie podano userId spróbuj pobrać je automatycznie z sesji
@@ -80,13 +80,16 @@ export function saveScore(scoreData) {
         totalQuestions: newScore.totalQuestions,
         passed: newScore.passed,
       };
-      // Fire-and-forget; jeśli błąd, pozostanie w localStorage
-      rankingAPI.submitScore(payload).catch((err) => {
+
+      // Await backend submission so callers can react to up-to-date data.
+      try {
+        await rankingAPI.submitScore(payload);
+      } catch (err) {
         console.warn(
           "Nie udało się wysłać wyniku do backendu, zapisano lokalnie",
           err
         );
-      });
+      }
     }
   } catch (err) {
     console.warn("Błąd podczas próby wysyłki wyniku do backendu", err);

@@ -135,13 +135,14 @@ import {
   onBeforeUnmount,
   watch,
 } from "vue";
-import { useRouter } from "vue-router";
+import { useRouter, useRoute } from "vue-router";
 import { useAuth } from "../store/auth.js";
 import { useErrors } from "../store/errors.js";
 import { authAPI } from "../services/api.js";
 
 const router = useRouter();
-const { store, login, logout } = useAuth();
+const route = useRoute();
+const { store, login, logout, ensureSession } = useAuth();
 const errorStore = useErrors();
 
 // Obserwuj stan zalogowania i przekieruj jeśli już zalogowany
@@ -149,7 +150,8 @@ watch(
   () => store.isAuth,
   (isAuth) => {
     if (isAuth) {
-      router.push("/home");
+      const redirectTo = route.query.redirect || "/home";
+      router.push(redirectTo);
     }
   },
   { immediate: true }
@@ -212,8 +214,13 @@ async function handleEmailLogin() {
   try {
     // Przykładowe wywołanie API (dostosuj do swojego backendu)
     await authAPI.login(loginForm);
+
+    // Ensure auth store picks up backend session via /api/me
+    await ensureSession();
+
     errorStore.showSuccess("Zalogowano pomyślnie!");
-    router.push("/home");
+    const redirectTo = route.query.redirect || "/home";
+    router.push(redirectTo);
   } catch (error) {
     errorStore.showError(error.message || "Błąd podczas logowania");
   } finally {

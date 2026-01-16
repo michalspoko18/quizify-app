@@ -13,7 +13,7 @@
           <!-- Informacje podstawowe -->
           <div class="mb-4">
             <h5 class="border-bottom pb-2">Informacje podstawowe</h5>
-            
+
             <div class="mb-3">
               <label for="quizTitle" class="form-label">Tytuł quizu *</label>
               <input
@@ -40,9 +40,15 @@
 
           <!-- Pytania -->
           <div class="mb-4">
-            <div class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3">
+            <div
+              class="d-flex justify-content-between align-items-center border-bottom pb-2 mb-3"
+            >
               <h5 class="mb-0">Pytania</h5>
-              <button type="button" class="btn btn-sm btn-primary" @click="addQuestion">
+              <button
+                type="button"
+                class="btn btn-sm btn-primary"
+                @click="addQuestion"
+              >
                 + Dodaj pytanie
               </button>
             </div>
@@ -52,7 +58,11 @@
             </div>
 
             <!-- Lista pytań -->
-            <div v-for="(question, qIndex) in quiz.questions" :key="qIndex" class="card mb-3">
+            <div
+              v-for="(question, qIndex) in quiz.questions"
+              :key="qIndex"
+              class="card mb-3"
+            >
               <div class="card-header bg-light">
                 <div class="d-flex justify-content-between align-items-center">
                   <strong>Pytanie {{ qIndex + 1 }}</strong>
@@ -81,7 +91,11 @@
                 <!-- Odpowiedzi -->
                 <div class="mb-2">
                   <label class="form-label">Odpowiedzi</label>
-                  <div v-for="(answer, aIndex) in question.answers" :key="aIndex" class="input-group mb-2">
+                  <div
+                    v-for="(answer, aIndex) in question.answers"
+                    :key="aIndex"
+                    class="input-group mb-2"
+                  >
                     <span class="input-group-text">
                       <input
                         type="radio"
@@ -125,12 +139,29 @@
           </div>
 
           <!-- Przyciski -->
+          <div v-if="saveError" class="alert alert-danger mb-3">
+            {{ saveError }}
+          </div>
+
           <div class="d-flex gap-2 justify-content-end">
-            <button type="button" class="btn btn-outline-secondary" @click="resetForm">
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              @click="resetForm"
+              :disabled="isSaving"
+            >
               Wyczyść
             </button>
-            <button type="submit" class="btn btn-success" :disabled="!isValid">
-              Zapisz quiz
+            <button
+              type="submit"
+              class="btn btn-success"
+              :disabled="!isValid || isSaving"
+            >
+              <span
+                v-if="isSaving"
+                class="spinner-border spinner-border-sm me-1"
+              ></span>
+              {{ isSaving ? "Zapisywanie..." : "Zapisz quiz" }}
             </button>
           </div>
         </form>
@@ -138,7 +169,12 @@
     </div>
 
     <!-- Modal potwierdzenia -->
-    <div v-if="showSuccess" class="modal show d-block" tabindex="-1" style="background: rgba(0,0,0,0.5)">
+    <div
+      v-if="showSuccess"
+      class="modal show d-block"
+      tabindex="-1"
+      style="background: rgba(0, 0, 0, 0.5)"
+    >
       <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content">
           <div class="modal-header bg-success text-white">
@@ -148,7 +184,9 @@
             <p class="mb-0">Quiz został zapisany pomyślnie!</p>
           </div>
           <div class="modal-footer">
-            <button type="button" class="btn btn-primary" @click="closeSuccess">OK</button>
+            <button type="button" class="btn btn-primary" @click="closeSuccess">
+              OK
+            </button>
           </div>
         </div>
       </div>
@@ -157,111 +195,150 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
-import { useRouter } from 'vue-router'
+import { ref, computed } from "vue";
+import { useRouter } from "vue-router";
+import { quizAPI } from "../services/api.js";
+import { useAuth } from "../store/auth.js";
+import { authCookies } from "../utils/cookies.js";
 
-const router = useRouter()
-const showSuccess = ref(false)
+const router = useRouter();
+const { store: authStore } = useAuth();
+const showSuccess = ref(false);
+const isSaving = ref(false);
+const saveError = ref("");
 
 const quiz = ref({
-  title: '',
-  description: '',
-  questions: []
-})
+  title: "",
+  description: "",
+  questions: [],
+});
 
 // Dodaj nowe pytanie
 function addQuestion() {
   quiz.value.questions.push({
     id: Date.now(),
-    question: '',
+    question: "",
     answers: [
-      { id: 1, text: '', isCorrect: true },
-      { id: 2, text: '', isCorrect: false }
-    ]
-  })
+      { id: 1, text: "", isCorrect: true },
+      { id: 2, text: "", isCorrect: false },
+    ],
+  });
 }
 
 // Usuń pytanie
 function removeQuestion(index) {
-  quiz.value.questions.splice(index, 1)
+  quiz.value.questions.splice(index, 1);
 }
 
 // Dodaj odpowiedź do pytania
 function addAnswer(questionIndex) {
-  const question = quiz.value.questions[questionIndex]
-  const newId = Math.max(...question.answers.map(a => a.id), 0) + 1
+  const question = quiz.value.questions[questionIndex];
+  const newId = Math.max(...question.answers.map((a) => a.id), 0) + 1;
   question.answers.push({
     id: newId,
-    text: '',
-    isCorrect: false
-  })
+    text: "",
+    isCorrect: false,
+  });
 }
 
 // Usuń odpowiedź
 function removeAnswer(questionIndex, answerIndex) {
-  const question = quiz.value.questions[questionIndex]
-  const wasCorrect = question.answers[answerIndex].isCorrect
-  question.answers.splice(answerIndex, 1)
-  
+  const question = quiz.value.questions[questionIndex];
+  const wasCorrect = question.answers[answerIndex].isCorrect;
+  question.answers.splice(answerIndex, 1);
+
   // Jeśli usunęliśmy poprawną odpowiedź, ustaw pierwszą jako poprawną
   if (wasCorrect && question.answers.length > 0) {
-    question.answers[0].isCorrect = true
+    question.answers[0].isCorrect = true;
   }
 }
 
 // Ustaw poprawną odpowiedź
 function setCorrectAnswer(questionIndex, answerIndex) {
-  const question = quiz.value.questions[questionIndex]
+  const question = quiz.value.questions[questionIndex];
   question.answers.forEach((answer, index) => {
-    answer.isCorrect = index === answerIndex
-  })
+    answer.isCorrect = index === answerIndex;
+  });
 }
 
 // Walidacja
 const isValid = computed(() => {
-  if (!quiz.value.title.trim()) return false
-  if (quiz.value.questions.length === 0) return false
-  
-  return quiz.value.questions.every(q => {
-    if (!q.question.trim()) return false
-    if (q.answers.length < 2) return false
-    if (!q.answers.every(a => a.text.trim())) return false
-    if (!q.answers.some(a => a.isCorrect)) return false
-    return true
-  })
-})
+  if (!quiz.value.title.trim()) return false;
+  if (quiz.value.questions.length === 0) return false;
+
+  return quiz.value.questions.every((q) => {
+    if (!q.question.trim()) return false;
+    if (q.answers.length < 2) return false;
+    if (!q.answers.every((a) => a.text.trim())) return false;
+    if (!q.answers.some((a) => a.isCorrect)) return false;
+    return true;
+  });
+});
 
 // Zapisz quiz
-function saveQuiz() {
-  if (!isValid.value) return
-  
-  // Zapisz do localStorage
-  const quizzes = JSON.parse(localStorage.getItem('custom_quizzes') || '[]')
-  const newQuiz = {
-    ...quiz.value,
-    id: Date.now(),
-    createdAt: new Date().toISOString()
+async function saveQuiz() {
+  if (!isValid.value) return;
+
+  isSaving.value = true;
+  saveError.value = "";
+
+  try {
+    // Przygotuj dane w formacie oczekiwanym przez backend
+    const payload = {
+      title: quiz.value.title,
+      description: quiz.value.description || "",
+      questions: quiz.value.questions.map((q) => ({
+        text: q.question,
+        answers: q.answers.map((a) => ({
+          text: a.text,
+          is_correct: a.isCorrect,
+        })),
+      })),
+    };
+    // Attach owner identifiers: local ownerId (if numeric) and Google owner id
+    const rawOwner = authStore.sub;
+    // try to convert to integer if it's a numeric string
+    const ownerId =
+      rawOwner && /^[0-9]+$/.test(String(rawOwner))
+        ? parseInt(rawOwner, 10)
+        : rawOwner;
+    if (ownerId) {
+      payload.ownerId = ownerId;
+    }
+
+    // If we have stored Google-sub in cookies, include it as ownerGoogleId
+    try {
+      const ud = authCookies.getUserData();
+      const googleSub = ud && ud.sub ? ud.sub : null;
+      if (googleSub) payload.ownerGoogleId = googleSub;
+    } catch (e) {
+      // ignore cookie parsing errors
+    }
+
+    await quizAPI.createQuiz(payload);
+    showSuccess.value = true;
+  } catch (error) {
+    saveError.value = error.message || "Nie udało się zapisać quizu";
+    console.error("Błąd zapisywania quizu:", error);
+  } finally {
+    isSaving.value = false;
   }
-  quizzes.push(newQuiz)
-  localStorage.setItem('custom_quizzes', JSON.stringify(quizzes))
-  
-  showSuccess.value = true
 }
 
 // Wyczyść formularz
 function resetForm() {
   quiz.value = {
-    title: '',
-    description: '',
-    questions: []
-  }
+    title: "",
+    description: "",
+    questions: [],
+  };
 }
 
 // Zamknij modal sukcesu
 function closeSuccess() {
-  showSuccess.value = false
-  resetForm()
-  router.push('/home')
+  showSuccess.value = false;
+  resetForm();
+  router.push("/home");
 }
 </script>
 
