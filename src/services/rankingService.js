@@ -80,6 +80,9 @@ export async function saveScore(scoreData) {
         totalQuestions: newScore.totalQuestions,
         passed: newScore.passed,
       };
+      if (!store.isAuth && newScore.userId) {
+        payload.userId = newScore.userId;
+      }
 
       // Await backend submission so callers can react to up-to-date data.
       try {
@@ -192,45 +195,51 @@ export function getGlobalRankings(limit = 10) {
 export function getUserStats(userId) {
   // Prefer backend
   const { store } = useAuth();
-  const effectiveUser =
-    userId || store?.sub || authCookies.getUserData()?.sub || null;
-  return rankingAPI
-    .getRanking({ type: "me", userId: effectiveUser })
-    .then((res) => res.data)
-    .catch(() => {
-      // local fallback
-      const rankings = getRankings();
-      const userScores = rankings.filter((r) => r.userId === userId);
+  if (store?.isAuth) {
+    return rankingAPI
+      .getRanking({ type: "me" })
+      .then((res) => res.data)
+      .catch(() => ({
+        totalQuizzes: 0,
+        averageScore: 0,
+        bestScore: 0,
+        totalCorrect: 0,
+        totalQuestions: 0,
+      }));
+  }
 
-      if (userScores.length === 0) {
-        return {
-          totalQuizzes: 0,
-          averageScore: 0,
-          bestScore: 0,
-          totalCorrect: 0,
-          totalQuestions: 0,
-        };
-      }
+  // local fallback
+  const rankings = getRankings();
+  const userScores = rankings.filter((r) => r.userId === userId);
 
-      const totalScore = userScores.reduce((sum, s) => sum + s.score, 0);
-      const totalCorrect = userScores.reduce(
-        (sum, s) => sum + s.correctAnswers,
-        0
-      );
-      const totalQuestions = userScores.reduce(
-        (sum, s) => sum + s.totalQuestions,
-        0
-      );
-      const bestScore = Math.max(...userScores.map((s) => s.score));
-
-      return {
-        totalQuizzes: userScores.length,
-        averageScore: Math.round(totalScore / userScores.length),
-        bestScore,
-        totalCorrect,
-        totalQuestions,
-      };
+  if (userScores.length === 0) {
+    return Promise.resolve({
+      totalQuizzes: 0,
+      averageScore: 0,
+      bestScore: 0,
+      totalCorrect: 0,
+      totalQuestions: 0,
     });
+  }
+
+  const totalScore = userScores.reduce((sum, s) => sum + s.score, 0);
+  const totalCorrect = userScores.reduce(
+    (sum, s) => sum + s.correctAnswers,
+    0
+  );
+  const totalQuestions = userScores.reduce(
+    (sum, s) => sum + s.totalQuestions,
+    0
+  );
+  const bestScore = Math.max(...userScores.map((s) => s.score));
+
+  return Promise.resolve({
+    totalQuizzes: userScores.length,
+    averageScore: Math.round(totalScore / userScores.length),
+    bestScore,
+    totalCorrect,
+    totalQuestions,
+  });
 }
 
 // Pobierz najpopularniejsze quizy (najczęściej wybierane)

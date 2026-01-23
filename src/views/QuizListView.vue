@@ -163,11 +163,8 @@
 import { ref, computed, onMounted } from "vue";
 import { useRouter } from "vue-router";
 import { quizAPI } from "../services/api.js";
-import { useAuth } from "../store/auth.js";
-import { authCookies } from "../utils/cookies.js";
 
 const router = useRouter();
-const { store: authStore } = useAuth();
 const customQuizzes = ref([]);
 const quizzes = ref([]);
 const loading = ref(false);
@@ -235,18 +232,7 @@ async function loadMyQuizzes() {
   loadingMine.value = true;
   errorMine.value = null;
   try {
-    const params = {};
-    // Prefer local user id if available
-    if (authStore.sub) params.ownerId = authStore.sub;
-    // Also send google sub if we have it in cookie user data
-    try {
-      const ud = authCookies.getUserData();
-      if (ud && ud.sub) params.ownerGoogleId = ud.sub;
-    } catch (e) {
-      // ignore
-    }
-
-    const { data } = await quizAPI.getMyQuizzes(params);
+    const { data } = await quizAPI.getMyQuizzes();
     customQuizzes.value = Array.isArray(data) ? data : [];
   } catch (e) {
     // If not authenticated/expired session, keep empty list and show message
@@ -260,16 +246,7 @@ async function loadMyQuizzes() {
 async function deleteQuiz(quizId) {
   if (!confirm("Czy na pewno chcesz usunąć ten quiz?")) return;
   try {
-    const params = {};
-    if (authStore.sub) params.ownerId = authStore.sub;
-    try {
-      const ud = authCookies.getUserData();
-      if (ud && ud.sub) params.ownerGoogleId = ud.sub;
-    } catch (e) {
-      // ignore
-    }
-
-    await quizAPI.deleteQuiz(quizId, params);
+    await quizAPI.deleteQuiz(quizId);
     await loadMyQuizzes();
   } catch (e) {
     alert(e.message || "Nie udało się usunąć quizu");

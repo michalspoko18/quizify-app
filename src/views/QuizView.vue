@@ -376,19 +376,21 @@ async function finishQuiz() {
   submitting.value = true;
 
   try {
-    // Wyślij odpowiedzi do backendu (dołączając userId aby backend mógł zapisać external_user_id)
-    const effectiveUserId = store?.sub || getOrCreateAnonId();
-    const response = await quizAPI.answerQuiz(quiz.value.id, {
-      answers: userAnswers.value,
-      userId: effectiveUserId,
-    });
+    // Wyślij odpowiedzi do backendu (anon dostaje external_user_id)
+    const localUserId = store?.sub || getOrCreateAnonId();
+    const payload = { answers: userAnswers.value };
+    if (!store?.isAuth) {
+      payload.userId = localUserId;
+    }
+
+    const response = await quizAPI.answerQuiz(quiz.value.id, payload);
     results.value = response.data;
 
     // Zapisz wynik do rankingu
     // Always save locally and attempt backend persist. saveScore will attach anon id if needed.
     try {
       await saveScore({
-        userId: effectiveUserId,
+        userId: localUserId,
         userName: store.name || store.email,
         userNick: store.nick || store.name,
         quizId: quiz.value.id,

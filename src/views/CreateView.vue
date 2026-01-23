@@ -198,11 +198,8 @@
 import { ref, computed } from "vue";
 import { useRouter } from "vue-router";
 import { quizAPI } from "../services/api.js";
-import { useAuth } from "../store/auth.js";
-import { authCookies } from "../utils/cookies.js";
 
 const router = useRouter();
-const { store: authStore } = useAuth();
 const showSuccess = ref(false);
 const isSaving = ref(false);
 const saveError = ref("");
@@ -295,26 +292,6 @@ async function saveQuiz() {
         })),
       })),
     };
-    // Attach owner identifiers: local ownerId (if numeric) and Google owner id
-    const rawOwner = authStore.sub;
-    // try to convert to integer if it's a numeric string
-    const ownerId =
-      rawOwner && /^[0-9]+$/.test(String(rawOwner))
-        ? parseInt(rawOwner, 10)
-        : rawOwner;
-    if (ownerId) {
-      payload.ownerId = ownerId;
-    }
-
-    // If we have stored Google-sub in cookies, include it as ownerGoogleId
-    try {
-      const ud = authCookies.getUserData();
-      const googleSub = ud && ud.sub ? ud.sub : null;
-      if (googleSub) payload.ownerGoogleId = googleSub;
-    } catch (e) {
-      // ignore cookie parsing errors
-    }
-
     await quizAPI.createQuiz(payload);
     showSuccess.value = true;
   } catch (error) {

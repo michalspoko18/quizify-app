@@ -82,11 +82,12 @@ export const authCookies = {
   },
 
   setUserData(userData, options = {}) {
+    const isSecure = location.protocol === "https:";
     const userOptions = {
       maxAge: 7 * 24 * 60 * 60, // 7 days
-      secure: true,
+      secure: isSecure,
       httpOnly: false, // Needs to be accessible by JS
-      sameSite: "Strict",
+      sameSite: "Lax",
       ...options,
     };
 
@@ -95,6 +96,10 @@ export const authCookies = {
 
   getAccessToken() {
     return cookieUtils.get(this.TOKEN_KEY);
+  },
+
+  getRefreshToken() {
+    return cookieUtils.get(this.REFRESH_TOKEN_KEY);
   },
 
   getUserData() {

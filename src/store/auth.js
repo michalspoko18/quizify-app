@@ -35,16 +35,60 @@ function saveNick(sub, v) {
   localStorage.setItem(nickKey(sub), v);
 }
 
+function applyAuthResponse(data) {
+  const accessToken = data?.accessToken || data?.access || data?.token;
+  const refreshToken = data?.refreshToken || data?.refresh || null;
+  const user = data?.user;
+  const name = data?.name || data?.profile?.name || null;
+  const picture = data?.picture || data?.profile?.picture || null;
+
+  if (!accessToken || !user) {
+    throw new Error("Invalid auth response");
+  }
+
+  authCookies.setAuthTokens(accessToken, refreshToken || "");
+  const userData = {
+    sub: String(user.id),
+    email: user.email,
+    name: name || user.nick || user.email,
+    picture: picture || null,
+    nick: user.nick || null,
+    permissions: user.permissions || [],
+  };
+
+  authCookies.setUserData(userData);
+
+  state.account = {
+    sub: userData.sub,
+    email: userData.email,
+    name: userData.name,
+    picture: userData.picture,
+  };
+  state.idToken = accessToken;
+  state.refreshToken = refreshToken;
+  state.nick = userData.nick || null;
+  state.permissions = userData.permissions || [];
+  state.lastActivity = Date.now();
+
+  scheduleTokenRefresh(accessToken);
+  state.isInitialized = true;
+}
+
 // Token refresh logic
 async function refreshAccessToken() {
   try {
-    const response = await authAPI.refreshToken();
+    const refreshToken =
+      authCookies.getRefreshToken() || state.refreshToken || null;
+    if (!refreshToken) {
+      throw new Error("Missing refresh token");
+    }
+    const response = await authAPI.refreshToken({ refreshToken });
     const { accessToken, refreshToken: newRefreshToken } = response.data;
 
     // Update tokens in cookies
-    authCookies.setAuthTokens(accessToken, newRefreshToken);
+    authCookies.setAuthTokens(accessToken, newRefreshToken || refreshToken);
     state.idToken = accessToken;
-    state.refreshToken = newRefreshToken;
+    state.refreshToken = newRefreshToken || refreshToken;
 
     // Schedule next refresh
     scheduleTokenRefresh(accessToken);
@@ -84,6 +128,7 @@ function scheduleTokenRefresh(token) {
 // Load user session from cookies
 function loadSessionFromCookies() {
   const token = authCookies.getAccessToken();
+  const refresh = authCookies.getRefreshToken();
   const userData = authCookies.getUserData();
 
   if (token && userData) {
@@ -98,6 +143,7 @@ function loadSessionFromCookies() {
         picture: userData.picture || payload.picture,
       };
       state.idToken = token;
+      state.refreshToken = refresh || null;
       state.nick = userData.nick || loadNick(userData.sub || payload.sub);
       state.permissions = userData.permissions || [];
       state.lastActivity = Date.now();
@@ -106,16 +152,11 @@ function loadSessionFromCookies() {
       scheduleTokenRefresh(token);
 
       return true;
-    } else {
-      // Token expired, clear cookies
-      authCookies.clearAuthCookies();
     }
   }
 
   return false;
 }
-
-console.log("VITE_GOOGLE_CLIENT_ID =", import.meta.env.VITE_GOOGLE_CLIENT_ID);
 
 export async function ensureSession() {
   if (state.isInitialized) {
@@ -130,66 +171,76 @@ export async function ensureSession() {
     return true;
   }
 
-  // Fallback to sessionStorage (for backward compatibility)
+  const refreshToken = authCookies.getRefreshToken();
+  if (refreshToken) {
+    try {
+      await refreshAccessToken();
+      if (loadSessionFromCookies()) {
+        state.isInitialized = true;
+        return true;
+      }
+    } catch (e) {
+      authCookies.clearAuthCookies();
+    }
+  }
+
+  // Fallback to legacy Google token stored in sessionStorage
   const stored = sessionStorage.getItem("quizapp:idtoken");
   if (stored) {
-    const p = decodeJwt(stored);
-    if (p && p.exp * 1000 > Date.now()) {
-      state.account = {
-        sub: p.sub,
-        email: p.email,
-        name: p.name,
-        picture: p.picture,
-      };
-      state.idToken = stored;
-      state.nick = loadNick(p.sub) || null;
-
-      // Migrate to cookie storage
-      const userData = {
-        sub: p.sub,
-        email: p.email,
-        name: p.name,
-        picture: p.picture,
-        nick: state.nick,
-        permissions: [],
-      };
-
-      authCookies.setAuthTokens(stored, "dummy_refresh_token"); // We don't have refresh token from Google
-      authCookies.setUserData(userData);
-
-      // Clear old storage
+    try {
+      const response = await authAPI.loginWithGoogle({
+        credential: stored,
+      });
+      applyAuthResponse(response.data);
       sessionStorage.removeItem("quizapp:idtoken");
-
-      state.isInitialized = true;
       return true;
-    } else {
-      // Remove expired token
+    } catch (e) {
       sessionStorage.removeItem("quizapp:idtoken");
     }
   }
 
-  // Try backend session-based auth (email/password login uses Django session cookie)
-  try {
-    const response = await authAPI.me();
-    const data = response?.data;
-    if (data && data.id) {
-      state.account = {
-        sub: String(data.id),
-        email: data.email,
-        name: data.nick || data.email,
-        picture: null,
-      };
-      state.idToken = null;
-      state.refreshToken = null;
-      state.nick = data.nick || null;
-      state.permissions = data.permissions || [];
-      state.lastActivity = Date.now();
+  // If we have a valid access token but no user data, fetch /me
+  const token = authCookies.getAccessToken();
+  if (token) {
+    const payload = decodeJwt(token);
+    if (payload && payload.exp * 1000 > Date.now()) {
+      state.idToken = token;
+      try {
+        const response = await authAPI.me();
+        const data = response?.data;
+        if (data && data.id) {
+          const userData = {
+            sub: String(data.id),
+            email: data.email,
+            name: data.nick || data.email,
+            picture: null,
+            nick: data.nick || null,
+            permissions: data.permissions || [],
+          };
 
-      state.isInitialized = true;
-      return true;
+          authCookies.setUserData(userData);
+
+          state.account = {
+            sub: userData.sub,
+            email: userData.email,
+            name: userData.name,
+            picture: userData.picture,
+          };
+          state.refreshToken = authCookies.getRefreshToken() || null;
+          state.nick = userData.nick || null;
+          state.permissions = userData.permissions || [];
+          state.lastActivity = Date.now();
+
+          scheduleTokenRefresh(token);
+          state.isInitialized = true;
+          return true;
+        }
+      } catch (e) {
+        // ignore
+      }
+    } else {
+      authCookies.clearAuthCookies();
     }
-  } catch (e) {
-    // not logged in via session
   }
 
   // Google login is optional: don't fail the whole app when missing
@@ -246,11 +297,11 @@ export async function login() {
       }
     }, 10000); // 10 sekund timeout
 
-    const handleSuccess = () => {
+    const handleSuccess = (result) => {
       if (!isResolved) {
         isResolved = true;
         clearTimeout(timeout);
-        resolve();
+        resolve(result);
       }
     };
 
@@ -273,34 +324,13 @@ export async function login() {
             return;
           }
 
-          state.account = {
-            sub: payload.sub,
-            email: payload.email,
-            name: payload.name,
-            picture: payload.picture,
-          };
-          state.idToken = resp.credential;
-          state.nick = loadNick(payload.sub) || null;
-          state.lastActivity = Date.now();
-
-          // Store in secure cookies instead of sessionStorage
-          const userData = {
-            sub: payload.sub,
-            email: payload.email,
-            name: payload.name,
-            picture: payload.picture,
-            nick: state.nick,
-            permissions: [],
-          };
-
-          authCookies.setAuthTokens(resp.credential, "google_token"); // Google doesn't provide refresh token in ID flow
-          authCookies.setUserData(userData);
-
-          // Schedule token refresh if possible
-          scheduleTokenRefresh(resp.credential);
-
-          console.log("Zalogowano:", payload.email);
-          handleSuccess();
+          const cachedNick = loadNick(payload.sub) || null;
+          state.nick = cachedNick;
+          handleSuccess({
+            credential: resp.credential,
+            payload,
+            nick: cachedNick,
+          });
         } catch (error) {
           handleError(error);
         }
@@ -501,6 +531,7 @@ export function useAuth() {
     },
     ensureSession,
     login,
+    setSession: applyAuthResponse,
     logout,
     setNick,
     refreshAccessToken,

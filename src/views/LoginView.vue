@@ -5,8 +5,8 @@
         <div class="card-body p-4 p-md-5">
           <h1 class="h3 mb-3">Logowanie</h1>
 
-          <div v-if="!store.isAuth" class="alert alert-info">
-            Niezalogowany.
+          <div v-if="!store.isAuth" class="">
+            <!-- Niezalogowany. -->
           </div>
           <div v-else class="alert alert-success">
             Zalogowano jako <strong>{{ store.name || store.username }}</strong
@@ -142,7 +142,7 @@ import { authAPI } from "../services/api.js";
 
 const router = useRouter();
 const route = useRoute();
-const { store, login, logout, ensureSession } = useAuth();
+const { store, login, setSession } = useAuth();
 const errorStore = useErrors();
 
 // Obserwuj stan zalogowania i przekieruj jeśli już zalogowany
@@ -154,7 +154,7 @@ watch(
       router.push(redirectTo);
     }
   },
-  { immediate: true }
+  { immediate: true },
 );
 
 // Stan formularza logowania email/hasło
@@ -213,10 +213,8 @@ async function handleEmailLogin() {
 
   try {
     // Przykładowe wywołanie API (dostosuj do swojego backendu)
-    await authAPI.login(loginForm);
-
-    // Ensure auth store picks up backend session via /api/me
-    await ensureSession();
+    const response = await authAPI.login(loginForm);
+    setSession(response.data);
 
     errorStore.showSuccess("Zalogowano pomyślnie!");
     const redirectTo = route.query.redirect || "/home";
@@ -237,17 +235,12 @@ async function handleGoogleLogin() {
   loginAbortController = new AbortController();
 
   try {
-    await login();
-    // Po stronie backendu utrwalamy użytkownika Google (sub, email, name, picture, nick)
-    if (store?.account?.sub && store?.account?.email) {
-      await authAPI.loginWithGoogle({
-        sub: store.account.sub,
-        email: store.account.email,
-        name: store.account.name,
-        picture: store.account.picture,
-        nick: store.nick,
-      });
-    }
+    const result = await login();
+    const response = await authAPI.loginWithGoogle({
+      credential: result.credential,
+      nick: store.nick,
+    });
+    setSession(response.data);
     errorStore.showSuccess("Zalogowano pomyślnie przez Google!");
     router.push("/home");
   } catch (error) {
@@ -257,7 +250,7 @@ async function handleGoogleLogin() {
       !error.message.includes("przerwane")
     ) {
       errorStore.showError(
-        error.message || "Błąd podczas logowania przez Google"
+        error.message || "Błąd podczas logowania przez Google",
       );
     }
   } finally {

@@ -93,7 +93,7 @@ export const authAPI = {
   register: (userData) => api.post("/auth/register", userData),
   loginWithGoogle: (data) => api.post("/auth/google", data),
   logout: () => api.post("/auth/logout"),
-  refreshToken: () => api.post("/auth/refresh"),
+  refreshToken: (data) => api.post("/auth/refresh", data),
   me: () => api.get("/me"),
   updateProfile: (data) => api.put("/auth/profile", data),
 };

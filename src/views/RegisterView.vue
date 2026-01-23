@@ -135,10 +135,12 @@
 import { ref, computed, reactive } from 'vue'
 import { useRouter } from 'vue-router'
 import { useErrors } from '../store/errors.js'
+import { useAuth } from '../store/auth.js'
 import { authAPI } from '../services/api.js'
 
 const router = useRouter()
 const errorStore = useErrors()
+const { setSession } = useAuth()
 
 // Stan formularza
 const form = reactive({
@@ -228,14 +230,14 @@ async function handleSubmit() {
     const { confirmPassword, acceptTerms, ...registerData } = form
     
     // Przykładowe wywołanie API (dostosuj do swojego backendu)
-    await authAPI.register(registerData)
+    const response = await authAPI.register(registerData)
+    setSession(response.data)
     
-    errorStore.showSuccess('Konto zostało utworzone! Sprawdź email i potwierdź rejestrację.')
+    errorStore.showSuccess('Konto zostało utworzone! Zalogowano automatycznie.')
     
-    // Przekieruj na stronę logowania po udanej rejestracji
     setTimeout(() => {
-      router.push('/login')
-    }, 2000)
+      router.push('/home')
+    }, 1000)
     
   } catch (error) {
     errorStore.showError(error.message || 'Błąd podczas rejestracji')
