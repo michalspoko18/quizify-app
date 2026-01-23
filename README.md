@@ -1,13 +1,41 @@
-# Instrukcja uruchomienia aplikacji 
+# quizify-app
 
-1. Zainstaluj Node.js w wersji wyższej niż 18
-    link to pobrania https://nodejs.org/en/download
-2. Uruchom komputer ponownie
-3. Wejdź do swojego środowiska programistycznego
-4. Sklonuj z github repozytorium z branch mainmain
-   1. Wpisz w terminalu git branch -a, aby sprawdzić jakie masz branche
-   2. wpisz w terminal: git branch mainmain
-   3. Jeżeli pojawił się po skonowaniu Folder QUIZIFY-APP to otwóz folder w VS
-5. w terminalu wpisz: npm install
-6. Jeżeli przeszło bez błędów wpisz w terminalu npm run dev
-   1. Wyświetli się w terminalu localhost z portem, po jego naciśnięciu otworzy się w przeglądarce aplikacja
+Frontend dla aplikacji Quizify. Projekt oparty o Vue 3 + Vite.
+
+**Stack**
+- Vue 3
+- Vite
+- Vue Router
+- Axios
+- @azure/msal-browser
+
+**Wymagania**
+- Node.js >= 18
+
+**Szybki start (lokalnie)**
+```bash
+npm install
+npm run dev
+```
+
+Aplikacja startuje pod `http://localhost:5173`.
+
+**Konfiguracja (.env.local)**
+Utworz plik `.env.local` w katalogu projektu:
+
+```bash
+VITE_API_BASE_URL=http://127.0.0.1:8000/api
+VITE_GOOGLE_CLIENT_ID=twoj-google-client-id
+```
+
+**Backend (quizify-api)**
+- API powinno dzialac pod `http://127.0.0.1:8000`.
+- `VITE_GOOGLE_CLIENT_ID` musi pasowac do `GOOGLE_CLIENT_ID` w backendzie.
+
+**Skrypty**
+- `npm run dev` - lokalny dev server
+- `npm run build` - build produkcyjny
+- `npm run preview` - podglad buildu
+
+**Sesje**
+- Szczegoly w `SESSION_MANAGEMENT.md`.
