@@ -40,7 +40,11 @@
               <h5 class="card-title">{{ quiz.title }}</h5>
               <p
                 class="card-text text-muted small"
-                :title="quiz.description && quiz.description.length > 140 ? quiz.description : ''"
+                :title="
+                  quiz.description && quiz.description.length > 140
+                    ? quiz.description
+                    : ''
+                "
               >
                 {{ truncate(quiz.description, 140) }}
               </p>
@@ -48,7 +52,12 @@
                 class="d-flex justify-content-between align-items-center mt-3"
               >
                 <small class="text-muted">
-                  {{ formatQuestionsLabel(quiz.questionsCount ?? ((quiz.questions && quiz.questions.length) || 0)) }}
+                  {{
+                    formatQuestionsLabel(
+                      quiz.questionsCount ??
+                        ((quiz.questions && quiz.questions.length) || 0)
+                    )
+                  }}
                 </small>
                 <RouterLink
                   :to="'/quiz/' + quiz.id"
@@ -100,13 +109,26 @@
               </div>
               <p
                 class="card-text text-muted"
-                :title="quiz.description && quiz.description.length > 200 ? quiz.description : ''"
+                :title="
+                  quiz.description && quiz.description.length > 200
+                    ? quiz.description
+                    : ''
+                "
               >
-                {{ quiz.description ? truncate(quiz.description, 200) : "Brak opisu" }}
+                {{
+                  quiz.description
+                    ? truncate(quiz.description, 200)
+                    : "Brak opisu"
+                }}
               </p>
               <div class="d-flex justify-content-between align-items-center">
                 <small class="text-muted">
-                  {{ formatQuestionsLabel(quiz.questionsCount ?? ((quiz.questions && quiz.questions.length) || 0)) }}
+                  {{
+                    formatQuestionsLabel(
+                      quiz.questionsCount ??
+                        ((quiz.questions && quiz.questions.length) || 0)
+                    )
+                  }}
                 </small>
                 <div class="btn-group">
                   <RouterLink
