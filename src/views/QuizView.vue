@@ -282,7 +282,7 @@
 import { ref, computed, onMounted } from "vue";
 import { useRoute, useRouter } from "vue-router";
 import { quizAPI } from "../services/api.js";
-import { saveScore, getOrCreateAnonId } from "../services/rankingService";
+import { getOrCreateAnonId } from "../services/rankingService";
 import { useAuth } from "../store/auth.js";
 
 const route = useRoute();
@@ -386,10 +386,15 @@ async function finishQuiz() {
     const response = await quizAPI.answerQuiz(quiz.value.id, payload);
     results.value = response.data;
 
-    // Zapisz wynik do rankingu
-    // Always save locally and attempt backend persist. saveScore will attach anon id if needed.
+    // Zapisz wynik do rankingu tylko lokalnie (backend już zapisał przez answerQuiz)
+    // Nie wywołuj saveScore dla zalogowanych - to tworzyłoby duplikat w bazie
     try {
-      await saveScore({
+      // Zapisz lokalnie dla offline dostępu i statystyk
+      const rankings = JSON.parse(
+        localStorage.getItem("quizify_rankings") || "[]",
+      );
+      rankings.push({
+        id: `score_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId: localUserId,
         userName: store.name || store.email,
         userNick: store.nick || store.name,
@@ -399,20 +404,18 @@ async function finishQuiz() {
         correctAnswers: results.value.correctAnswers,
         totalQuestions: results.value.totalQuestions,
         passed: results.value.passed,
+        timestamp: new Date().toISOString(),
       });
+      localStorage.setItem("quizify_rankings", JSON.stringify(rankings));
 
       // Notify other parts of the app (e.g. Ranking view) that rankings changed
-      try {
-        window.dispatchEvent(new CustomEvent("ranking:updated"));
-      } catch (e) {
-        // ignore
-      }
+      window.dispatchEvent(new CustomEvent("ranking:updated"));
     } catch (e) {
-      console.warn("saveScore failed:", e);
+      console.warn("Local score save failed:", e);
     }
 
     showResults.value = true;
-    console.log("Wyniki quizu:", results.value);
+    // console.log("Wyniki quizu:", results.value);
   } catch (err) {
     error.value =
       err?.message || "Nie udało się wysłać odpowiedzi. Spróbuj ponownie.";
@@ -597,7 +600,9 @@ onMounted(() => {
 }
 
 .incorrect-answers-list .card {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition:
+    transform 0.2s ease,
+    box-shadow 0.2s ease;
 }
 
 .incorrect-answers-list .card:hover {

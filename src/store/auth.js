@@ -16,6 +16,7 @@ const state = reactive({
 let gisReady = false;
 let clientId = null;
 let refreshTokenTimer = null;
+let ensureSessionPromise = null; // Cache for preventing duplicate API calls
 
 function decodeJwt(token) {
   try {
@@ -159,118 +160,133 @@ function loadSessionFromCookies() {
 }
 
 export async function ensureSession() {
+  // Prevent duplicate concurrent calls
+  if (ensureSessionPromise) {
+    return ensureSessionPromise;
+  }
+
   if (state.isInitialized) {
     return state.account !== null;
   }
 
-  // First try to load from cookies (Google token flow)
-  const hasValidCookieSession = loadSessionFromCookies();
-
-  if (hasValidCookieSession) {
-    state.isInitialized = true;
-    return true;
-  }
-
-  const refreshToken = authCookies.getRefreshToken();
-  if (refreshToken) {
+  // Create a cached promise for concurrent callers
+  ensureSessionPromise = (async () => {
     try {
-      await refreshAccessToken();
-      if (loadSessionFromCookies()) {
+      // First try to load from cookies (Google token flow)
+      const hasValidCookieSession = loadSessionFromCookies();
+
+      if (hasValidCookieSession) {
         state.isInitialized = true;
         return true;
       }
-    } catch (e) {
-      authCookies.clearAuthCookies();
-    }
-  }
 
-  // Fallback to legacy Google token stored in sessionStorage
-  const stored = sessionStorage.getItem("quizapp:idtoken");
-  if (stored) {
-    try {
-      const response = await authAPI.loginWithGoogle({
-        credential: stored,
-      });
-      applyAuthResponse(response.data);
-      sessionStorage.removeItem("quizapp:idtoken");
-      return true;
-    } catch (e) {
-      sessionStorage.removeItem("quizapp:idtoken");
-    }
-  }
-
-  // If we have a valid access token but no user data, fetch /me
-  const token = authCookies.getAccessToken();
-  if (token) {
-    const payload = decodeJwt(token);
-    if (payload && payload.exp * 1000 > Date.now()) {
-      state.idToken = token;
-      try {
-        const response = await authAPI.me();
-        const data = response?.data;
-        if (data && data.id) {
-          const userData = {
-            sub: String(data.id),
-            email: data.email,
-            name: data.nick || data.email,
-            picture: null,
-            nick: data.nick || null,
-            permissions: data.permissions || [],
-          };
-
-          authCookies.setUserData(userData);
-
-          state.account = {
-            sub: userData.sub,
-            email: userData.email,
-            name: userData.name,
-            picture: userData.picture,
-          };
-          state.refreshToken = authCookies.getRefreshToken() || null;
-          state.nick = userData.nick || null;
-          state.permissions = userData.permissions || [];
-          state.lastActivity = Date.now();
-
-          scheduleTokenRefresh(token);
-          state.isInitialized = true;
-          return true;
+      const refreshToken = authCookies.getRefreshToken();
+      if (refreshToken) {
+        try {
+          await refreshAccessToken();
+          if (loadSessionFromCookies()) {
+            state.isInitialized = true;
+            return true;
+          }
+        } catch (e) {
+          authCookies.clearAuthCookies();
         }
-      } catch (e) {
-        // ignore
       }
-    } else {
-      authCookies.clearAuthCookies();
-    }
-  }
 
-  // Google login is optional: don't fail the whole app when missing
-  clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  if (!clientId) {
-    console.warn("Brak VITE_GOOGLE_CLIENT_ID — Google login disabled");
-    state.isInitialized = true;
-    return false;
-  }
-
-  // Initialize Google Identity Services
-  if (!gisReady) {
-    await new Promise((r) => {
-      if (window.google?.accounts?.id) return r();
-      const i = setInterval(() => {
-        if (window.google?.accounts?.id) {
-          clearInterval(i);
-          r();
+      // Fallback to legacy Google token stored in sessionStorage
+      const stored = sessionStorage.getItem("quizapp:idtoken");
+      if (stored) {
+        try {
+          const response = await authAPI.loginWithGoogle({
+            credential: stored,
+          });
+          applyAuthResponse(response.data);
+          sessionStorage.removeItem("quizapp:idtoken");
+          return true;
+        } catch (e) {
+          sessionStorage.removeItem("quizapp:idtoken");
         }
-      }, 30);
-      setTimeout(() => {
-        clearInterval(i);
-        r();
-      }, 5000);
-    });
-    gisReady = !!window.google?.accounts?.id;
-  }
+      }
 
-  state.isInitialized = true;
-  return false;
+      // If we have a valid access token but no user data, fetch /me
+      const token = authCookies.getAccessToken();
+      if (token) {
+        const payload = decodeJwt(token);
+        if (payload && payload.exp * 1000 > Date.now()) {
+          state.idToken = token;
+          try {
+            const response = await authAPI.me();
+            const data = response?.data;
+            if (data && data.id) {
+              const userData = {
+                sub: String(data.id),
+                email: data.email,
+                name: data.nick || data.email,
+                picture: null,
+                nick: data.nick || null,
+                permissions: data.permissions || [],
+              };
+
+              authCookies.setUserData(userData);
+
+              state.account = {
+                sub: userData.sub,
+                email: userData.email,
+                name: userData.name,
+                picture: userData.picture,
+              };
+              state.refreshToken = authCookies.getRefreshToken() || null;
+              state.nick = userData.nick || null;
+              state.permissions = userData.permissions || [];
+              state.lastActivity = Date.now();
+
+              scheduleTokenRefresh(token);
+              state.isInitialized = true;
+              return true;
+            }
+          } catch (e) {
+            // ignore
+          }
+        } else {
+          authCookies.clearAuthCookies();
+        }
+      }
+
+      // Google login is optional: don't fail the whole app when missing
+      clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+      if (!clientId) {
+        console.warn("Brak VITE_GOOGLE_CLIENT_ID — Google login disabled");
+        state.isInitialized = true;
+        return false;
+      }
+
+      // Initialize Google Identity Services
+      if (!gisReady) {
+        await new Promise((r) => {
+          if (window.google?.accounts?.id) return r();
+          const i = setInterval(() => {
+            if (window.google?.accounts?.id) {
+              clearInterval(i);
+              r();
+            }
+          }, 30);
+          setTimeout(() => {
+            clearInterval(i);
+            r();
+          }, 5000);
+        });
+        gisReady = !!window.google?.accounts?.id;
+      }
+
+      state.isInitialized = true;
+      return false;
+    } finally {
+      // Clear the promise cache after completion
+      ensureSessionPromise = null;
+    }
+  })();
+
+  return ensureSessionPromise;
 }
 
 export async function login() {
